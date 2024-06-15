@@ -22,9 +22,9 @@ def actualizar_cotizaciones():
         else:
             datos[accion] = 'N/D'  # No disponible
     
-    for accion, precio in datos.items():
-        if precio != 'N/D':
-            precio = f"{precio:.2f}"
+        for accion, precio in datos.items():
+         if precio != 'N/D':
+            precio = f"${precio:.2f}"  # Agregar signo de pesos
         treeview.item(accion, values=(accion, precio))
     
     root.after(60000, actualizar_cotizaciones)  # Actualizar cada 60 segundos
