@@ -1,0 +1,91 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import Counter
+from ta.momentum import RSIIndicator
+from ta.trend import SMAIndicator
+
+# Lista de acciones
+acciones = [
+    'GOLDD.BA', 'DISND.BA', 'MELI.BA', 'MELID.BA', 'MRVL.BA', 'BYMA.BA',
+    'ARKKD.BA', 'ARKK.BA', 'VIST.BA', 'VISTD.BA', 'TGNO4.BA', 'GGAL.BA',
+    'TXAR.BA', 'LOMA.BA', 'TRAN.BA', 'TGSU2.BA', 'PAMPD.BA', 'YPF',
+    'YPFD.BA', 'BMA.BA', 'CRES.BA', 'CEPU.BA', 'COME.BA', 'MORI.BA',
+    'PAMP.BA', 'AGRO.BA', 'IRSA.BA', 'AMZN.BA', 'BHIP.BA'
+]
+
+# Fechas de inicio y fin para los últimos 6 meses
+end_date = pd.to_datetime('today')
+start_date = end_date - pd.DateOffset(months=6)
+
+# Función para descargar datos y calcular indicadores
+def get_stock_data(ticker):
+    df = yf.download(ticker, start=start_date, end=end_date)
+    if df.empty:
+        return None
+    
+    df['SMA50'] = SMAIndicator(df['Close'], window=50).sma_indicator()
+    df['SMA200'] = SMAIndicator(df['Close'], window=200).sma_indicator()
+    df['RSI'] = RSIIndicator(df['Close']).rsi()
+    
+    return df
+
+# Función para determinar la recomendación
+def get_recommendation(df):
+    if df is None or df.empty:
+        return 'Data Not Available'
+    
+    last_close = df['Close'].iloc[-1]
+    sma50 = df['SMA50'].iloc[-1]
+    sma200 = df['SMA200'].iloc[-1]
+    rsi = df['RSI'].iloc[-1]
+    
+    if last_close > sma50 > sma200 and rsi < 70:
+        return 'Buy'
+    elif last_close < sma50 < sma200 and rsi > 30:
+        return 'Sell'
+    else:
+        return 'Hold'
+
+# Obtener datos y recomendaciones para todas las acciones
+recomendaciones = {}
+for accion in acciones:
+    data = get_stock_data(accion)
+    recomendacion = get_recommendation(data)
+    recomendaciones[accion] = recomendacion
+
+# Contar las recomendaciones por acción
+counters = {accion: Counter([recomendaciones[accion]]) for accion in acciones}
+
+# Preparar datos para el gráfico de barras apiladas
+df_plot = pd.DataFrame(counters).T.fillna(0)
+
+# Asegurar que todas las columnas ('Buy', 'Hold', 'Sell') estén presentes
+for col in ['Buy', 'Hold', 'Sell']:
+    if col not in df_plot.columns:
+        df_plot[col] = 0
+
+# Ordenar las acciones por la cantidad total de recomendaciones
+df_plot['Total'] = df_plot.sum(axis=1)
+df_plot = df_plot.sort_values(by='Total', ascending=False).drop(columns=['Total'])
+
+# Colores para las recomendaciones
+colors = {'Buy': 'green', 'Hold': 'blue', 'Sell': 'red'}
+
+# Crear el gráfico de barras apiladas
+plt.figure(figsize=(12, 8))
+bottom = np.zeros(len(df_plot))
+for rec in ['Buy', 'Hold', 'Sell']:
+    plt.bar(df_plot.index, df_plot[rec], bottom=bottom, color=colors[rec], label=rec)
+    bottom += df_plot[rec]
+
+plt.title('Distribución de Recomendaciones por Acción')
+plt.xlabel('Acciones')
+plt.ylabel('Número de Acciones')
+plt.legend()
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+
+# Mostrar el gráfico
+plt.show()
